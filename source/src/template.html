@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en-GB" data-pwa="{{PWA}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MINDWORK — a cognitive training playground</title>
+<meta name="description" content="Offline practice for thinking and communicating: idea development, reasoning, perspective, precision and conversation.">
+<meta name="theme-color" content="#1C1B21">
+{{HEAD}}
+<script>try{var p=JSON.parse(localStorage.getItem('mw-prefs')||'{}');var r=document.documentElement;if(p.theme&&p.theme!=='system')r.setAttribute('data-theme',p.theme);if(p.textSize)r.setAttribute('data-size',p.textSize);if(p.motion)r.setAttribute('data-motion',p.motion);}catch(e){}</script>
+<style>{{FONTS}}
+{{CSS}}</style>
+</head>
+<body>
+<div id="splash" aria-hidden="true" style="position:fixed;inset:0;display:grid;place-items:center;background:#1C1B21;color:#F6F4F0;font:800 2rem system-ui,sans-serif;letter-spacing:-.04em;z-index:99">MIND<span style="color:#E8226F">WORK</span></div>
+<noscript><p style="padding:2rem;font-family:sans-serif">MINDWORK needs JavaScript to run. Everything runs locally in your browser.</p></noscript>
+<script>{{JS}}</script>
+</body>
+</html>

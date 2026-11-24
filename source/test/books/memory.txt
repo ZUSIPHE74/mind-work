@@ -1,0 +1,33 @@
+REMEMBERING
+
+Chapter 1
+
+How Memories Form
+
+## Encoding
+
+Encoding is the process by which an experience is converted into a form the brain can store. Attention matters most at this stage because information that is never attended to is rarely encoded at all.
+
+Elaborative encoding refers to linking new information to things you already know. Unlike rote repetition, elaborative encoding creates several routes back to the same memory.
+
+## Consolidation
+
+Consolidation is the gradual stabilisation of a memory after it has been encoded. Sleep supports consolidation because the brain replays recent experiences during deep sleep.
+
+There are three stages of memory: encoding, consolidation and retrieval.
+
+Chapter 2
+
+Why We Forget
+
+## Decay and interference
+
+Interference is what happens when similar memories compete with one another during retrieval. Retroactive interference occurs when new learning disrupts older memories, whereas proactive interference occurs when older memories disrupt new learning.
+
+Forgetting is not always a failure. Forgetting irrelevant details leads to clearer recall of the details that matter.
+
+## The testing effect
+
+The testing effect is the finding that retrieving information strengthens memory more than rereading it. Retrieval practice works because each successful retrieval makes the route to the memory easier to find next time.
+
+Spacing refers to distributing practice over time rather than concentrating it in one session. Spaced practice feels harder than massed practice, yet it produces more durable learning.
