@@ -1,14 +1,1 @@
-{
-  "outputDirectory": "app",
-  "functions": {
-    "api/ai.js": {
-      "maxDuration": 60
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/ai-status.json",
-      "destination": "/api/ai-status"
-    }
-  ]
-}
+{"outputDirectory":"app"}

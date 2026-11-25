@@ -4190,11 +4190,19 @@ Reply with ONLY a JSON object: {"reflection": "...", "noticed": "... or empty", 
     return { id: `imp-${phase === 'reassess' ? 'r' : 'p'}-${t.id}-${n}`, type: 'aiset', improve: { targetId: t.id, phase }, createdAt: now, items: pick.map(x => ({ game: x, sid: x, state: 'pending' })), objective: phase === 'reassess' ? 'Two new conversations. Talk as you normally would.' : 'Two conversations: try adding something of your own alongside your questions.' }; }
 
   /* ── client */
-  const client = { provider: 'none', detail: '', sample: null };
+  const client = { provider: 'none', detail: '', sample: null, own: null };
+  /* her own free key, stored only on her device: { provider: 'gemini', key, model } */
+  const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
+  async function geminiModels(key, f) { f = f || fetch; const r = await f(GEMINI + '/models?pageSize=200', { headers: { 'x-goog-api-key': key } }).catch(() => null);
+    if (!r) throw Object.assign(new Error('Couldn’t reach Google. Check your connection.'), { code: 'offline' }); const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(r.status === 400 || r.status === 403 ? 'Google didn’t accept that key. Check you copied all of it.' : (j.error && j.error.message) || 'Google refused the request.'), { code: 'no_key' });
+    return (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent') && !/image|tts|audio|live|embed|vision|aqa/i.test(m.name)).map(m => ({ id: m.name.replace(/^models\//, ''), name: m.displayName || m.name })); }
+  function pickModel(list) { const flash = list.filter(m => /flash/i.test(m.id) && !/lite/i.test(m.id)); const stable = flash.filter(m => !/preview|exp/i.test(m.id)); return (stable[0] || flash[0] || list[0] || {}).id || null; }
   async function detect() {
     if (!isNode && root.claude && typeof root.claude.use === 'function') {
       try { const s = await root.claude.use('sample'); if (s) { client.sample = s; client.provider = 'claude'; client.detail = 'Claude, through your claude.ai account'; return client; } } catch (e) { /* absent */ }
     }
+    if (client.own && client.own.key && client.own.model) { client.provider = 'gemini'; client.detail = 'Google Gemini (free tier) with your own key'; return client; }
     /* ai-status.json is a static file saying 'unavailable'; serve.py answers it live. Offline: no request at all. */ if (typeof navigator !== 'undefined' && navigator.onLine === false) { client.provider = 'none'; client.detail = ''; return client; } try { const r = await fetch('ai-status.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j.available) { client.provider = 'server'; client.detail = `${j.provider} (${j.model})`; return client; } } } catch (e) { /* offline or not self-hosted */ }
     client.provider = 'none'; client.detail = ''; return client;
   }
@@ -4206,6 +4214,16 @@ Reply with ONLY a JSON object: {"reflection": "...", "noticed": "... or empty", 
       try { const r = await client.sample(prompt, { modelTier: opts.tier || 'default', cache: false, signal: opts.signal }); return r.text; }
       catch (e) { throw Object.assign(new Error(ERR[e.code] || e.message || 'Claude couldn’t answer.'), { code: e.code || 'failed' }); }
     }
+    if (client.provider === 'gemini') {
+      const o = client.own; const r = await fetch(`${GEMINI}/models/${encodeURIComponent(o.model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': o.key }, signal: opts.signal,
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: Object.assign({ maxOutputTokens: Math.max(2048, opts.max || 1200), temperature: 0.7 }, opts.json ? { responseMimeType: 'application/json' } : {}) }) }).catch(e => { if (e && e.name === 'AbortError') throw e; return null; });
+      if (!r) throw Object.assign(new Error(ERR.offline), { code: 'offline' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { const code = r.status === 429 ? 'rate_limited' : r.status === 400 || r.status === 403 ? 'no_key' : 'failed'; throw Object.assign(new Error(code === 'rate_limited' ? 'Google’s free limit was reached for now. Wait a minute (or until tomorrow for the daily limit) and try again.' : code === 'no_key' ? 'Google didn’t accept your key. Reconnect it in Settings.' : (j.error && j.error.message) || 'Gemini couldn’t answer.'), { code }); }
+      const c = (j.candidates || [])[0]; const text = c && c.content && (c.content.parts || []).map(p => p.text || '').join('');
+      if (!text) throw Object.assign(new Error(c && c.finishReason === 'SAFETY' ? 'Gemini declined to answer this.' : ERR.bad_format), { code: 'bad_format' });
+      return text;
+    }
     if (client.provider === 'server') {
       const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, max_tokens: opts.max || 1200 }), signal: opts.signal }).catch(() => null);
       if (!r) throw Object.assign(new Error(ERR.offline), { code: 'offline' });
@@ -4215,10 +4233,10 @@ Reply with ONLY a JSON object: {"reflection": "...", "noticed": "... or empty", 
     }
     throw Object.assign(new Error('AI isn’t available here.'), { code: 'unavailable' });
   }
-  async function askJSON(prompt, opts) { const t = await ask(prompt, opts); return parseJSON(t); }
+  async function askJSON(prompt, opts) { const t = await ask(prompt, Object.assign({ json: true }, opts || {})); return parseJSON(t); }
 
   const _d = deepTurnPrompt, _c = convoTurnPrompt, _f = feedbackPrompt, _r = reflectPrompt;
-  const api = { groupTurnPrompt, deepTurnPromptL: (o) => withLang(_d(o), o.lang), convoTurnPromptL: (o) => withLang(_c(o), o.lang), feedbackPromptL: (o) => withLang(_f(o), o.lang), reflectPromptL: (o) => withLang(_r(o), o.lang), XH, aiOccurred, aiCandidates, aiSet, reflectPrompt, DIRECTIONS, CONVO_MOVES, deepTurnPrompt, convoTurnPrompt, feedbackPrompt, parseJSON, guardFeedback, cleanDeepTurn, convoPatterns, client, detect, ask, askJSON, ERR };
+  const api = { geminiModels, pickModel, groupTurnPrompt, deepTurnPromptL: (o) => withLang(_d(o), o.lang), convoTurnPromptL: (o) => withLang(_c(o), o.lang), feedbackPromptL: (o) => withLang(_f(o), o.lang), reflectPromptL: (o) => withLang(_r(o), o.lang), XH, aiOccurred, aiCandidates, aiSet, reflectPrompt, DIRECTIONS, CONVO_MOVES, deepTurnPrompt, convoTurnPrompt, feedbackPrompt, parseJSON, guardFeedback, cleanDeepTurn, convoPatterns, client, detect, ask, askJSON, ERR };
   if (isNode) module.exports = api; else root.MWAI = api;
 })(this);
 
@@ -5656,7 +5674,7 @@ Competency ids: ${CP.COMPETENCIES.map(c => c.id).join(', ')}.${lang === 'xh' ? '
   const DIMNAME = { clarity: 'Clarity', specificity: 'Specificity', development: 'Development', variety: 'Variety', relevance: 'Relevance', connections: 'Connections', reasoning: 'Reasoning', nuance: 'Nuance', organisation: 'Organisation', expression: 'Expression', contribution: 'Contribution' };
 
   // ───────────── shell
-  const APP_VERSION = '5.0.0';
+  const APP_VERSION = '5.0.1';
   // Seven destinations (approved information architecture, 21 November 2026). Every existing address still works.
   const DESTS = [
     { id: 'today', label: 'Today', href: '#home', glyph: 'burst', purpose: 'Your starting point: today’s plan, what’s unfinished, quick starts.', envs: [] },
@@ -8974,6 +8992,36 @@ Reply with ONLY a JSON object: {"observed": [{"point": "...", "evidence": "her e
       catch (er) { el.innerHTML = `<p class="warn">${esc(er.message)}</p>`; } }
   });
 })(this);
+
+;
+/* ui-byok.js */
+/* MINDWORK — use your own free AI key (Google Gemini free tier). The key is stored only on this device, never in backups,
+   GitHub or the hosting site; everyone who opens a shared link connects their own. */
+(function () {
+  const U = window.MWUI, A = window.MWAI; const { S, DB, esc, $, toast } = U;
+  let models = null, busy = false;
+  U.onLoad.push(async () => { const own = await DB.get('kv', 'ai-own-key').catch(() => null); if (own && own.key) { A.client.own = own; if (A.client.provider !== 'claude') { await A.detect(); U.route(); } } });
+  const prefsOrig = U.routes.prefs, prefsAfter = U.routes.prefs.after;
+  U.routes.prefs = () => { const own = A.client.own;
+    return prefsOrig() + `<section class="panel" id="ownKey"><h2>Use your own free AI key</h2>
+      ${A.client.provider === 'claude' ? '<p class="muted">On this page AI already runs on Claude through your claude.ai account, at no extra cost. A key is only needed on other copies (such as a Vercel or Netlify site).</p>' : ''}
+      <p>Google’s Gemini API has a free tier: no card, no charges, with daily limits. Get a key at <strong>aistudio.google.com</strong> › Get API key, then paste it here.</p>
+      <ul class="plain-list small"><li><strong>Privacy:</strong> on Google’s free tier, what you send may be used by Google to improve its products. That includes your messages in AI conversations, mentor sessions and any AI feedback or reflection you ask for. Your journal, check-ins, books and history are never sent.</li>
+        <li>The key is stored only on this device. It is never put in backups, GitHub or the hosting site, and nobody else can use it.</li>
+        <li>If you share the app’s link, each person connects their own key and uses their own free allowance.</li>
+        <li>The mentor was designed and tested around Claude. A smaller free model may follow its rules less well; MINDWORK still removes any feedback not backed by your own words.</li></ul>
+      ${own && own.key ? `<p class="ok">Connected: Gemini, model <strong>${esc(own.model)}</strong>.</p>${models ? `<label class="sel">Model <select id="okModel">${models.map(m => `<option value="${esc(m.id)}" ${m.id === own.model ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>` : ''}<div class="row"><button class="btn small ghost" data-action="ok-models">Choose a different model</button><button class="btn small ghost" data-action="ok-remove">Remove key</button></div>`
+        : `<label class="field labelled"><span>Gemini API key</span><input type="password" id="okKey" autocomplete="off" spellcheck="false" placeholder="Paste your key"></label><button class="btn" data-action="ok-connect" ${busy ? 'disabled' : ''}>${busy ? 'Checking…' : 'Connect'}</button>`}</section>`; };
+  U.routes.prefs.after = prefsAfter;
+  async function save(own) { A.client.own = own; await DB.put('kv', 'ai-own-key', own); await A.detect(); }
+  document.addEventListener('click', async e => { const t = e.target.closest('[data-action]'); if (!t || !t.dataset.action.startsWith('ok-')) return; const a = t.dataset.action;
+    if (a === 'ok-connect') { const key = ($('#okKey').value || '').trim(); if (!key) { toast('Paste your key first.'); return; } busy = true; U.route();
+      try { models = await A.geminiModels(key); const model = A.pickModel(models); if (!model) throw new Error('No suitable free model is available for this key.'); await save({ provider: 'gemini', key, model }); toast('Connected. AI features now use Gemini.'); }
+      catch (er) { toast(er.message); } busy = false; U.route(); }
+    if (a === 'ok-models') { try { models = await A.geminiModels(A.client.own.key); U.route(); } catch (er) { toast(er.message); } }
+    if (a === 'ok-remove') { A.client.own = null; models = null; await DB.del('kv', 'ai-own-key').catch(() => DB.put('kv', 'ai-own-key', null)); await A.detect(); toast('Key removed from this device.'); U.route(); } });
+  document.addEventListener('change', async e => { if (e.target.id === 'okModel') { await save(Object.assign({}, A.client.own, { model: e.target.value })); toast('Model changed.'); } });
+})();
 
 ;
 /* ui-i18n.js */

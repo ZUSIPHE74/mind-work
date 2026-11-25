@@ -1,5 +1,5 @@
 /* MINDWORK service worker: cache the whole app on install, serve cache-first, never touch the network for core use. */
-const CACHE = 'mindwork-bee65ca82f';
+const CACHE = 'mindwork-17f0a7b9e6';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   // first install activates immediately; updates wait until the user chooses to reload
