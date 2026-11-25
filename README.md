@@ -108,10 +108,11 @@ A personal cognitive training playground. Offline-first, installable, private: n
 **On phones and tablets:** browsers only install web apps from a secure (https) address. `serve.py` prints a Wi-Fi
 address that phones can open, but over plain http they can't install it or keep it offline. To install on phones:
 
-1. Put the contents of the `app` folder on any free static https host, for example:
-   - Netlify Drop (app.netlify.com/drop): drag the `app` folder onto the page.
-   - GitHub Pages: push the `app` folder's files to a repository and turn on Pages.
-   Your data never goes there. The host only serves the app's files; everything you do stays on each device.
+1. Import this repository into Vercel. `vercel.json` publishes the `app` folder and provides the serverless AI endpoints.
+   In Vercel Project Settings → Environment Variables, add `ANTHROPIC_API_KEY`, then redeploy to enable AI-backed
+   conversations and feedback. Keep the key in Vercel; never commit it. The public AI endpoint uses your Anthropic
+   account, so visitors can trigger requests and incur charges. Set an appropriate usage limit with Anthropic. The
+   Vercel server does not store conversations; AI prompts are sent to Anthropic. Your other app data stays on each device.
 2. Open that https address on the phone.
    - Android (Chrome, Edge, Samsung Internet): menu → Install app / Add to Home screen.
    - iPhone/iPad: open in Safari → Share → Add to Home Screen.
